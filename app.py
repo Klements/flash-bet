@@ -3,17 +3,18 @@ import pandas as pd
 
 st.set_page_config(page_title="Statistiche squadre (football-data.co.uk)", layout="wide")
 st.title("Statistiche medie ultime 5 e 10 partite per squadra")
-st.caption("Dati in formato football-data.co.uk – vedi notes.txt per il significato delle colonne.")
+st.caption("Puoi caricare più CSV (anche di campionati diversi). Le squadre saranno aggregate senza duplicati.")
 
 
 # -----------------------------
 # Funzioni di utilità
 # -----------------------------
-def prepara_dataframe(uploaded_file: "UploadedFile") -> pd.DataFrame | None:
+def prepara_dataframe(file_obj) -> pd.DataFrame | None:
+    """Legge un singolo CSV football-data.co.uk e fa i controlli base."""
     try:
-        df = pd.read_csv(uploaded_file)
+        df = pd.read_csv(file_obj)
     except Exception as e:
-        st.error(f"Errore nella lettura del CSV: {e}")
+        st.error(f"Errore nella lettura del CSV '{getattr(file_obj, 'name', '')}': {e}")
         return None
 
     # Proviamo a parsare la data se presente
@@ -24,9 +25,8 @@ def prepara_dataframe(uploaded_file: "UploadedFile") -> pd.DataFrame | None:
     required_cols = {"HomeTeam", "AwayTeam"}
     if not required_cols.issubset(df.columns):
         st.error(
-            "Il file caricato non contiene le colonne minime richieste "
-            "'HomeTeam' e 'AwayTeam'.\n\n"
-            "Verifica che il file sia nel formato standard football-data.co.uk."
+            f"Il file '{getattr(file_obj, 'name', '')}' non contiene le colonne minime richieste "
+            "'HomeTeam' e 'AwayTeam'. Verifica che il file sia nel formato standard football-data.co.uk."
         )
         return None
 
@@ -121,27 +121,40 @@ def calcola_statistiche_squadra(df: pd.DataFrame, team: str, n_matches: int = 5)
 
 
 # -----------------------------
-# UI: Upload del file
+# UI: Upload di uno o più file
 # -----------------------------
-uploaded_file = st.file_uploader(
-    "Carica un file CSV di football-data.co.uk",
+uploaded_files = st.file_uploader(
+    "Carica uno o più file CSV di football-data.co.uk",
     type=["csv"],
-    help="Ad esempio un file della Serie A / Premier League scaricato da football-data.co.uk",
+    accept_multiple_files=True,
+    help="Puoi caricare file di campionati diversi (Serie A, Premier, Liga, ecc.)."
 )
 
-if uploaded_file is None:
-    st.info("Carica un CSV per iniziare.")
+if not uploaded_files:
+    st.info("Carica almeno un CSV per iniziare.")
     st.stop()
 
-df = prepara_dataframe(uploaded_file)
-if df is None:
+dfs = []
+for f in uploaded_files:
+    df_single = prepara_dataframe(f)
+    if df_single is not None:
+        dfs.append(df_single)
+
+if not dfs:
+    st.error("Nessun file valido è stato caricato.")
     st.stop()
 
+# Uniamo tutti i CSV in un unico DataFrame
+df = pd.concat(dfs, ignore_index=True, sort=False)
+
+st.success(f"Caricati {len(dfs)} file. Numero totale di partite: {len(df)}")
+
 # -----------------------------
-# UI: selezione squadre
+# UI: selezione squadre (da TUTTI i CSV)
 # -----------------------------
-all_teams = pd.unique(pd.concat([df["HomeTeam"], df["AwayTeam"]])).tolist()
-all_teams = sorted([t for t in all_teams if pd.notna(t)])
+# Unione di tutte le squadre home/away + rimozione duplicati + ordinamento
+all_teams_series = pd.concat([df["HomeTeam"], df["AwayTeam"]], ignore_index=True)
+all_teams = sorted(all_teams_series.dropna().unique().tolist())
 
 col1, col2 = st.columns(2)
 
@@ -177,7 +190,7 @@ for team, col in zip([team1, team2], [col_team1, col_team2]):
         if stats5 is None and stats10 is None:
             st.info("Non ci sono abbastanza dati per calcolare le statistiche per questa squadra.")
         else:
-            # Costruiamo una tabella con due colonne: Ultime 5 / Ultime 10
+            # Tabella con due colonne: Ultime 5 / Ultime 10
             frames = []
             if stats5 is not None:
                 s5 = stats5.copy()
@@ -191,15 +204,14 @@ for team, col in zip([team1, team2], [col_team1, col_team2]):
             stats_combined = pd.concat(frames, axis=1)
             st.table(stats_combined.style.format("{:.2f}"))
 
-        # Mostriamo il dettaglio delle partite considerate (fino a 10)
-        # Se matches10 è vuoto, usiamo matches5
+        # Dettaglio partite considerate (max 10)
         detail_matches = matches10 if matches10 is not None and not matches10.empty else matches5
 
         with st.expander("Dettaglio partite considerate (max 10)"):
             if detail_matches is None or detail_matches.empty:
                 st.write("Nessuna partita disponibile.")
             else:
-                cols_to_show = ["Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"]
+                cols_to_show = ["Date", "Div", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"]
                 cols_to_show = [c for c in cols_to_show if c in detail_matches.columns]
                 st.dataframe(detail_matches[cols_to_show])
 
