@@ -2,14 +2,14 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Statistiche squadre (football-data.co.uk)", layout="wide")
-st.title("Statistiche medie ultime 5 partite per squadra")
+st.title("Statistiche medie ultime 5 e 10 partite per squadra")
 st.caption("Dati in formato football-data.co.uk – vedi notes.txt per il significato delle colonne.")
 
 
 # -----------------------------
 # Funzioni di utilità
 # -----------------------------
-def prepara_dataframe(uploaded_file: "uploaded_file") -> pd.DataFrame | None: # type: ignore
+def prepara_dataframe(uploaded_file: "UploadedFile") -> pd.DataFrame | None:
     try:
         df = pd.read_csv(uploaded_file)
     except Exception as e:
@@ -162,24 +162,46 @@ if team1 == team2:
 # -----------------------------
 # Calcolo e visualizzazione risultati
 # -----------------------------
-st.subheader("Statistiche medie (ultime 5 partite al massimo)")
+st.subheader("Statistiche medie (ultime 5 e 10 partite)")
 
 col_team1, col_team2 = st.columns(2)
 
 for team, col in zip([team1, team2], [col_team1, col_team2]):
     with col:
         st.markdown(f"### {team}")
-        matches, stats_df = calcola_statistiche_squadra(df, team, n_matches=5)
 
-        if stats_df is None:
+        # Calcolo per ultime 5 e ultime 10
+        matches5, stats5 = calcola_statistiche_squadra(df, team, n_matches=5)
+        matches10, stats10 = calcola_statistiche_squadra(df, team, n_matches=10)
+
+        if stats5 is None and stats10 is None:
             st.info("Non ci sono abbastanza dati per calcolare le statistiche per questa squadra.")
         else:
-            st.table(stats_df.style.format("{:.2f}"))
+            # Costruiamo una tabella con due colonne: Ultime 5 / Ultime 10
+            frames = []
+            if stats5 is not None:
+                s5 = stats5.copy()
+                s5.columns = ["Ultime 5"]
+                frames.append(s5)
+            if stats10 is not None:
+                s10 = stats10.copy()
+                s10.columns = ["Ultime 10"]
+                frames.append(s10)
 
-        with st.expander("Dettaglio partite considerate"):
-            cols_to_show = ["Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"]
-            cols_to_show = [c for c in cols_to_show if c in matches.columns]
-            st.dataframe(matches[cols_to_show])
+            stats_combined = pd.concat(frames, axis=1)
+            st.table(stats_combined.style.format("{:.2f}"))
+
+        # Mostriamo il dettaglio delle partite considerate (fino a 10)
+        # Se matches10 è vuoto, usiamo matches5
+        detail_matches = matches10 if matches10 is not None and not matches10.empty else matches5
+
+        with st.expander("Dettaglio partite considerate (max 10)"):
+            if detail_matches is None or detail_matches.empty:
+                st.write("Nessuna partita disponibile.")
+            else:
+                cols_to_show = ["Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"]
+                cols_to_show = [c for c in cols_to_show if c in detail_matches.columns]
+                st.dataframe(detail_matches[cols_to_show])
 
 
 st.caption(
