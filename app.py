@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Statistiche squadre (football-data.co.uk)", layout="wide")
+st.set_page_config(page_title="FlashBet", layout="wide")
+st.title("⚡ FLASH BET ⚡ - Il sito per i pro del betting")
 
 # -----------------------------
 # LOGIN
@@ -9,7 +10,7 @@ st.set_page_config(page_title="Statistiche squadre (football-data.co.uk)", layou
 def check_login():
     users = st.secrets.get("users", {})
 
-    # Se già loggato → mostra solo il profilo
+    # === SE L'UTENTE È GIÀ LOGGATO ===
     if st.session_state.get("logged_in", False):
         username = st.session_state["username"]
 
@@ -17,8 +18,6 @@ def check_login():
             st.markdown("### 👋 Benvenuto")
             st.markdown(f"**{username}**")
             st.markdown("---")
-
-            # Mostra icona profilo + nome
             st.markdown(
                 f"""
                 <div style="display:flex; align-items:center; gap:10px;">
@@ -30,20 +29,25 @@ def check_login():
             )
         return True
 
-    # Se NON loggato → mostra form login
+    # === SE NON È LOGGATO → MOSTRA IL FORM LOGIN ===
     with st.sidebar:
         st.title("Login")
 
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        login_button = st.button("Entra")
+        # FORM → gestisce automaticamente "Invio"
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
 
-        if login_button:
+            # Questo bottone serve anche per ENTER
+            submitted = st.form_submit_button("Entra")
+
+        # Se è stato premuto INVIO o il bottone
+        if submitted:
             if username in users and password == users[username]:
                 st.session_state["logged_in"] = True
                 st.session_state["username"] = username
 
-                # Aggiorna la UI
+                # rerun compatibile per aggiornare UI
                 if hasattr(st, "rerun"):
                     st.rerun()
                 else:
@@ -58,7 +62,6 @@ def check_login():
 if not check_login():
     st.stop()
 
-st.title("Statistiche medie ultime 5 e 10 partite per squadra")
 st.caption("Puoi caricare più CSV (anche di campionati diversi). Le squadre saranno aggregate senza duplicati.")
 
 
