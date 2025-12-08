@@ -1,12 +1,22 @@
 import streamlit as st
 import pandas as pd
+import base64
 
-st.set_page_config(page_title="FlashBet", layout="wide")
-col1, col2, col3 = st.columns([1, 2, 1])
+st.set_page_config(page_title="White Code", layout="wide")
+def img_to_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
 
-with col2:
-    st.image("img/banner_white_code.png")
+banner = img_to_base64("img/banner_white_code.png")
 
+st.markdown(
+    f"""
+    <div style="width:100%; margin-top:-25px;">
+        <img src="data:image/png;base64,{banner}" style="width:100%; display:block;">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # -----------------------------
@@ -90,7 +100,7 @@ def prepara_dataframe(file_obj) -> pd.DataFrame | None:
     if not required_cols.issubset(df.columns):
         st.error(
             f"Il file '{getattr(file_obj, 'name', '')}' non contiene le colonne minime richieste "
-            "'HomeTeam' e 'AwayTeam'. Verifica che il file sia nel formato standard football-data.co.uk."
+            "'HomeTeam' e 'AwayTeam'. Verifica che il file sia nel formato standard"
         )
         return None
 
@@ -188,7 +198,7 @@ def calcola_statistiche_squadra(df: pd.DataFrame, team: str, n_matches: int = 5)
 # UI: Upload di uno o più file
 # -----------------------------
 uploaded_files = st.file_uploader(
-    "Carica uno o più file CSV di football-data.co.uk",
+    "Carica uno o più file CSV",
     type=["csv"],
     accept_multiple_files=True,
     help="Puoi caricare file di campionati diversi (Serie A, Premier, Liga, ecc.)."
@@ -278,9 +288,3 @@ for team, col in zip([team1, team2], [col_team1, col_team2]):
                 cols_to_show = ["Date", "Div", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"]
                 cols_to_show = [c for c in cols_to_show if c in detail_matches.columns]
                 st.dataframe(detail_matches[cols_to_show])
-
-
-st.caption(
-    "Le colonne sono quelle standard di football-data.co.uk (FTHG, FTAG, HS, HST, ecc.). "
-    "Vedi il file notes.txt sul sito per il dettaglio di ogni colonna."
-)
